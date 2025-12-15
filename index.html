@@ -11,12 +11,12 @@
     p{margin-top:0;color:#444}
     .box{background:white;border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(20,20,40,0.06)}
     #typing{width:100%;height:120px;border:1px dashed #ddd;border-radius:8px;padding:12px;font-size:16px;resize:none}
-    .controls{display:flex;gap:8px;margin-top:12px}
+    .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
     button{padding:10px 14px;border-radius:10px;border:0;cursor:pointer;box-shadow:0 6px 12px rgba(20,20,40,0.06)}
     button.primary{background:#0b84ff;color:white}
     button.secondary{background:#f0f3f6}
     .note{font-size:13px;color:#666;margin-top:10px}
-    .reveal{margin-top:14px;padding:12px;border-radius:8px;background:#fffbe6;border:1px solid #fde7a8}
+    .reveal{margin-top:14px;padding:12px;border-radius:8px;background:#fffbe6;border:1px solid #fde7a8;white-space:pre-wrap}
     .footer{font-size:13px;color:#666;margin-top:8px}
   </style>
 </head>
@@ -28,31 +28,25 @@
   </div>
 
   <div id="editorArea" style="display:none;">
-  <div id="nameScreen" class="box" style="max-width:400px;margin:40px auto;text-align:center;">
-    <h2>Inserisci qui il tuo nome :)</h2>
-    <input id="userName" type="text" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;font-size:16px;">
-    <button id="startBtn" class="primary" style="margin-top:12px;width:100%;">Inizia</button>
-  </div>
+    <div class="app">
+      <h1>Nascondi parole mentre scrivi</h1>
+      <p>Digita nel riquadro. Ogni volta che premi <strong>barra spaziatrice</strong> la parola appena completata verrà nascosta. Premi <strong>Ho finito</strong> per rivelare tutto quello che hai scritto.</p>
 
-  <div id="editorArea" style="display:none;">
-  <div class="app">
-    <h1>Nascondi parole mentre scrivi</h1>
-    <p>Digita nel riquadro. Ogni volta che premi <strong>barra spaziatrice</strong> la parola appena completata verrà nascosta. Premi <strong>Ho finito</strong> per rivelare tutto quello che hai scritto.</p>
+      <div class="box">
+        <textarea id="typing" placeholder="Inizia a scrivere..." ></textarea>
 
-    <div class="box">
-      <textarea id="typing" placeholder="Inizia a scrivere..." autofocus></textarea>
+        <div class="controls">
+          <button id="emailBtn" class="secondary">Invia email</button>
+          <button id="finishBtn" class="primary">Ho finito</button>
+          <button id="undoBtn" class="secondary">Annulla ultima</button>
+          <button id="resetBtn" class="secondary">Resetta</button>
+        </div>
 
-      <div class="controls">
-        <button id="emailBtn" class="secondary">Invia email</button>
-        <button id="finishBtn, emailBtn" class="primary">Ho finito</button>
-        <button id="undoBtn" class="secondary">Annulla ultima</button>
-        <button id="resetBtn" class="secondary">Resetta</button>
+        <div class="note">Parole nascoste: <span id="hiddenCount">0</span></div>
+
+        <div id="revealArea" class="reveal" style="display:none"></div>
+        <div class="footer">Consiglio: scrivi normalmente. Se vuoi inserire uno spazio senza nascondere la parola, premi <em>Shift + Spazio</em>.</div>
       </div>
-
-      <div class="note">Parole nascoste: <span id="hiddenCount">0</span></div>
-
-      <div id="revealArea" class="reveal" style="display:none"></div>
-      <div class="footer">Consiglio: scrivi normalmente. Se vuoi inserire uno spazio senza nascondere la parola, premi <em>Shift + Spazio</em>.</div>
     </div>
   </div>
 
@@ -60,78 +54,75 @@
     (function(){
       const ta = document.getElementById('typing');
       const finishBtn = document.getElementById('finishBtn');
-      const emailBtn /* updated */ = document.getElementById('emailBtn');
+      const emailBtn = document.getElementById('emailBtn');
       const undoBtn = document.getElementById('undoBtn');
       const resetBtn = document.getElementById('resetBtn');
       const hiddenCount = document.getElementById('hiddenCount');
       const revealArea = document.getElementById('revealArea');
 
-      // Store full sequence of words typed, including those hidden
-      let allWords = []; // in order typed
-      let visibleWords = []; // words currently visible
+      const startBtn = document.getElementById('startBtn');
+      const userNameInput = document.getElementById('userName');
+      const nameScreen = document.getElementById('nameScreen');
+      const editorArea = document.getElementById('editorArea');
 
-      // Helper: split text into words, keep trailing partial
+      let savedName = '';
+      let allWords = [];
+
       function splitWords(text){
-        // split on spaces, but keep empty trimmed
         return text.split(/\s+/).filter(Boolean);
       }
 
-      // When user presses space (keydown), capture current last word and hide it
+      function updateHiddenCount(){
+        hiddenCount.textContent = allWords.length;
+      }
+
+      // Space key hides last word (unless Shift is held)
       ta.addEventListener('keydown', function(e){
         if(e.key === ' ' && !e.shiftKey){
           e.preventDefault();
           const text = ta.value;
-          // find last word typed (since last space)
           const parts = text.match(/(\S+)\s*$/);
           const lastWord = parts ? parts[1] : '';
           if(lastWord){
-            // push to allWords and mark as hidden by not adding to visibleWords
             allWords.push(lastWord);
-            // remove lastWord from textarea display
-            // remove the last occurrence of lastWord at end
+            // remove the last word and trailing spaces
             ta.value = text.slice(0, text.length - lastWord.length).replace(/\s+$/,'');
             updateHiddenCount();
-          } else {
-            // if there's no last word (multiple spaces), do nothing and keep caret
           }
         }
       });
 
-      // Also track when user pastes or types without pressing space: keep typed words that are separated by spaces
-      ta.addEventListener('input', function(e){
-        // This handler won't auto-hide; hiding happens on space only.
-        // Allow free typing.
-      });
-
-      emailBtn.addEventListener('click', function(){
-        const current = ta.value.trim();
-        const currentWords = current ? splitWords(current) : [];
-        const fullText = allWords.concat(currentWords).join(' ');
-        const mail = 'mailto:marcocarniel94@gmail.com?subject=Testo%20completo&body=' + encodeURIComponent(fullText);
-        window.location.href = mail;
-      });
-
+      // Finish -> reveal full text (hidden + current)
       finishBtn.addEventListener('click', function(){
-        // When finished, collect current textarea content as last partial or full words
         const current = ta.value.trim();
         const currentWords = current ? splitWords(current) : [];
-        // Combine allWords (hidden) + currentWords
         const fullText = allWords.concat(currentWords).join(' ');
         revealArea.style.display = 'block';
         revealArea.textContent = fullText || '(vuoto)';
       });
 
+      // Email -> opens mail client with full text
+      emailBtn.addEventListener('click', function(){
+        const current = ta.value.trim();
+        const currentWords = current ? splitWords(current) : [];
+        const fullText = allWords.concat(currentWords).join(' ');
+        const today = new Date().toISOString().split('T')[0];
+        const subject = `proiettivo scrittura - ${savedName || ''} - ${today}`;
+        const mail = 'mailto:marcocarniel94@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(fullText);
+        window.location.href = mail;
+      });
+
+      // Undo last hidden word
       undoBtn.addEventListener('click', function(){
-        // restore last hidden word back into textarea
         if(allWords.length === 0) return;
         const w = allWords.pop();
-        // append to textarea with a trailing space so user can continue
         ta.value = (ta.value ? ta.value + ' ' : '') + w + ' ';
         ta.focus();
         updateHiddenCount();
         revealArea.style.display = 'none';
       });
 
+      // Reset app
       resetBtn.addEventListener('click', function(){
         if(!confirm('Resetta tutto? Le parole nascoste andranno perse dalla vista.')) return;
         allWords = [];
@@ -140,66 +131,17 @@
         updateHiddenCount();
       });
 
-      function updateHiddenCount(){
-        hiddenCount.textContent = allWords.length;
-      }
-
-      // Start button logic
-      const startBtn = document.getElementById('startBtn');
-      const userNameInput = document.getElementById('userName');
-      const nameScreen = document.getElementById('nameScreen');
-      const editorArea = document.getElementById('editorArea');
-
-      let savedName = '';
-
+      // Start: collect name and show editor
       startBtn.addEventListener('click', function(){
         savedName = userNameInput.value.trim();
         if(!savedName) return alert('Inserisci un nome per continuare');
         nameScreen.style.display = 'none';
         editorArea.style.display = 'block';
+        ta.focus();
       });
 
-      // Email button with dynamic date and name
-      emailBtn.addEventListener('click', function(){
-        const current = ta.value.trim();
-        const currentWords = current ? splitWords(current) : [];
-        const fullText = allWords.concat(currentWords).join(' ');
-        const today = new Date().toISOString().split('T')[0];
-        const subject = `proiettivo scrittura - ${savedName} - ${today}`;
-        const mail = 'mailto:marcocarniel94@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(fullText);
-        window.location.href = mail;
-      });
-
-      // Start button logic
-      const startBtn = document.getElementById('startBtn');
-      const userNameInput = document.getElementById('userName');
-      const nameScreen = document.getElementById('nameScreen');
-      const editorArea = document.getElementById('editorArea');
-
-      let savedName = '';
-
-      startBtn.addEventListener('click', function(){
-        savedName = userNameInput.value.trim();
-        if(!savedName) return alert('Inserisci un nome per continuare');
-        nameScreen.style.display = 'none';
-        editorArea.style.display = 'block';
-      });
-
-      // Email button with dynamic date and name
-      emailBtn.addEventListener('click', function(){
-        const current = ta.value.trim();
-        const currentWords = current ? splitWords(current) : [];
-        const fullText = allWords.concat(currentWords).join(' ');
-        const today = new Date().toISOString().split('T')[0];
-        const subject = `proiettivo scrittura - ${savedName} - ${today}`;
-        const mail = 'mailto:marcocarniel94@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(fullText);
-        window.location.href = mail;
-      });
-
-      // Accessibility: allow pressing Enter on button via keyboard
+      // Initialize
       updateHiddenCount();
-
-      // Prevent form submission on Enter in textarea (do nothing special)
     })();
   </script>
 </body>
