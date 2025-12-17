@@ -68,6 +68,10 @@
       let savedName = '';
       let allWords = [];
 
+      // For input-based detection
+      let prevValue = '';
+      let composing = false; // composition (IME) flag
+
       function splitWords(text){
         return text.split(/\s+/).filter(Boolean);
       }
@@ -76,20 +80,59 @@
         hiddenCount.textContent = allWords.length;
       }
 
-      // Space key hides last word (unless Shift is held)
+      // keydown for desktop keyboards (keeps previous behavior)
       ta.addEventListener('keydown', function(e){
-        if(e.key === ' ' && !e.shiftKey){
+        // desktop: space key
+        if(e.key === ' ' && !e.shiftKey && !composing){
           e.preventDefault();
           const text = ta.value;
           const parts = text.match(/(\S+)\s*$/);
           const lastWord = parts ? parts[1] : '';
           if(lastWord){
             allWords.push(lastWord);
-            // remove the last word and trailing spaces
             ta.value = text.slice(0, text.length - lastWord.length).replace(/\s+$/,'');
+            prevValue = ta.value;
             updateHiddenCount();
           }
         }
+      });
+
+      // Handle IME composition (important for some mobile/IME flows)
+      ta.addEventListener('compositionstart', function(){ composing = true; });
+      ta.addEventListener('compositionend', function(){
+        composing = false;
+        // Update prevValue after composition finished
+        prevValue = ta.value;
+      });
+
+      // input event: catch space inserted by virtual keyboards (Android/iOS)
+      ta.addEventListener('input', function(){
+        if(composing) {
+          // while composing do not process
+          prevValue = ta.value;
+          return;
+        }
+        const cur = ta.value;
+        // detect a new trailing whitespace inserted (previously did not end with whitespace)
+        const curEndsSpace = /\s$/.test(cur);
+        const prevEndsSpace = /\s$/.test(prevValue);
+        if(curEndsSpace && !prevEndsSpace){
+          // a space was just inserted at the end — hide the last word from prevValue
+          const m = prevValue.match(/(\S+)\s*$/);
+          const lastWord = m ? m[1] : '';
+          if(lastWord){
+            allWords.push(lastWord);
+            // restore textarea to prevValue without that word and without trailing spaces
+            const newVal = prevValue.slice(0, prevValue.length - lastWord.length).replace(/\s+$/,'');
+            ta.value = newVal;
+            // set prevValue accordingly (so future input is compared correctly)
+            prevValue = ta.value;
+            updateHiddenCount();
+            return; // done
+          }
+        }
+        // otherwise just update prevValue
+        prevValue = cur;
       });
 
       // Finish -> reveal full text (hidden + current)
@@ -117,6 +160,7 @@
         if(allWords.length === 0) return;
         const w = allWords.pop();
         ta.value = (ta.value ? ta.value + ' ' : '') + w + ' ';
+        prevValue = ta.value;
         ta.focus();
         updateHiddenCount();
         revealArea.style.display = 'none';
@@ -127,6 +171,7 @@
         if(!confirm('Resetta tutto? Le parole nascoste andranno perse dalla vista.')) return;
         allWords = [];
         ta.value = '';
+        prevValue = '';
         revealArea.style.display = 'none';
         updateHiddenCount();
       });
@@ -142,6 +187,7 @@
 
       // Initialize
       updateHiddenCount();
+      prevValue = ta.value;
     })();
   </script>
 </body>
