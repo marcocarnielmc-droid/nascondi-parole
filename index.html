@@ -151,7 +151,7 @@
         const fullText = allWords.concat(currentWords).join(' ');
         const today = new Date().toISOString().split('T')[0];
         const subject = `proiettivo scrittura - ${savedName || ''} - ${today}`;
-        const mail = 'mailto:marcocarniel94@gmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(fullText);
+        const mail = 'mailto:marco.carniel@mywayservices.ch?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(fullText);
         window.location.href = mail;
       });
 
